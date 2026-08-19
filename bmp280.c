@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include "bmp280.h"
-#include "systick.h"
+#include "systick/systick.h"
 
 BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
 {

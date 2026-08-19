@@ -1,0 +1,6 @@
+[submodule "i2c"]
+	path = i2c
+	url = git@github.com:krapyv/stm32-i2c-driver.git
+[submodule "systick"]
+	path = systick
+	url = git@github.com:krapyv/stm32-systick-driver.git

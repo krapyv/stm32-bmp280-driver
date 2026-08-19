@@ -2,7 +2,7 @@
 #define BMP280_H
 
 #include <stdint.h>
-#include "i2c.h"
+#include "i2c/i2c.h"
 
 #define BMP280_CHIP_ID 0x58
 
