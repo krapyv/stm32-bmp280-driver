@@ -88,7 +88,8 @@ typedef enum
     BMP280_STATE_COMPENSATE,
     BMP280_STATE_READY,
     BMP280_STATE_ERROR,
-    BMP280_STATE_FAULT
+    BMP280_STATE_FAULT,
+    BMP280_STATE_DEAD
 } BMP280_State_t;
 
 typedef struct
@@ -124,6 +125,7 @@ typedef struct
     BMP280_Request_Status_t request_status;
     uint8_t retries;             // reset only on full-cycle success
     uint32_t measure_start_tick; // for measure status polling
+    uint32_t missed_stop_start_tick;
     BMP280_Start_Tick_Status_t measure_start_tick_status;
     uint8_t register_addr;     // for register-address byte ahead of each Transmit_Receive
     uint8_t raw_calib[24];     // dedicated RX buffer for calibration burst

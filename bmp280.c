@@ -2,6 +2,20 @@
 #include "bmp280.h"
 #include "systick/systick.h"
 
+BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
+{
+    // the transaction is not done
+    if (SysTick_GetTick() - hbmp->missed_stop_start_tick >= 3)
+    {
+        hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
+        I2C_Cleanup();
+        hbmp->request_status = BMP280_REQUEST_NONE;
+
+        return BMP280_ERR_TIMEOUT;
+    }
+    return BMP280_OK;
+}
+
 BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
 {
     // early rejection of a transaction with invalid parameters
@@ -16,6 +30,10 @@ BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
         {
             hbmp->request_status = BMP280_REQUEST_NONE;
             hbmp->state = BMP280_STATE_RECONSTRUCT_CALIBRATION;
+        }
+        else
+        {
+            return BMP280_InflightTransactionTimeout(hbmp);
         }
 
         // if the transaction is not done, exit without advancing the state
@@ -33,6 +51,7 @@ BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
+    hbmp->missed_stop_start_tick = SysTick_GetTick();
 
     return BMP280_OK;
 }
@@ -77,6 +96,10 @@ BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
             hbmp->request_status = BMP280_REQUEST_NONE;
             hbmp->state = BMP280_STATE_MEASURING;
         }
+        else
+        {
+            return BMP280_InflightTransactionTimeout(hbmp);
+        }
 
         // if the transaction is not done, exit without advancing the state
         return BMP280_OK;
@@ -96,6 +119,7 @@ BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
+    hbmp->missed_stop_start_tick = SysTick_GetTick();
 
     return BMP280_OK;
 }
@@ -146,8 +170,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
         }
         else
         {
-            // if the transaction is not done, exit
-            return BMP280_OK;
+            return BMP280_InflightTransactionTimeout(hbmp);
         }
     }
 
@@ -161,6 +184,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
+    hbmp->missed_stop_start_tick = SysTick_GetTick();
 
     return BMP280_OK;
 }
@@ -180,8 +204,14 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
             hbmp->request_status = BMP280_REQUEST_NONE;
             hbmp->state = BMP280_STATE_RECONSTRUCT_MEASURAMENTS;
         }
+        // transaction is not done yet
+        else
+        {
+            // check for the timeout
+            // if the transaction is not done and timeout is not hit, exit without advancing the state
+            return BMP280_InflightTransactionTimeout(hbmp);
+        }
 
-        // if the transaction is not done, exit without advancing the state
         return BMP280_OK;
     }
 
@@ -195,6 +225,7 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
+    hbmp->missed_stop_start_tick = SysTick_GetTick();
 
     return BMP280_OK;
 }
@@ -296,6 +327,13 @@ BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
 
             hbmp->state = BMP280_STATE_READ_CALIBRATION;
         }
+        // transaction is not done yet
+        else
+        {
+            // check for the timeout
+            // if the transaction is not done and timeout is not hit, exit without advancing the state
+            return BMP280_InflightTransactionTimeout(hbmp);
+        }
 
         // if the transaction is not done, exit without advancing the state
         return BMP280_OK;
@@ -309,6 +347,7 @@ BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
+    hbmp->missed_stop_start_tick = SysTick_GetTick();
 
     return BMP280_OK;
 }
