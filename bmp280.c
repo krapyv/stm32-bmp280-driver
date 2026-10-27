@@ -5,7 +5,7 @@
 BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
 {
     // the transaction is not done
-    if (SysTick_GetTick() - hbmp->missed_stop_start_tick >= 3)
+    if (SysTick_GetTick() - hbmp->missed_stop_start_tick >= BMP280_I2C_TXN_TIMEOUT_TICKS)
     {
         hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
         I2C_Cleanup();
