@@ -146,6 +146,8 @@ typedef struct
     int32_t temp_value;
     uint32_t press_value;
 
+    uint32_t measure_tick;
+
     uint8_t isInitialized;
 } BMP280_HandleTypeDef;
 

@@ -201,6 +201,7 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
     {
         if (hbmp->hi2c->state == I2C_STATE_DONE)
         {
+            hbmp->measure_tick = SysTick_GetTick();
             hbmp->request_status = BMP280_REQUEST_NONE;
             hbmp->state = BMP280_STATE_RECONSTRUCT_MEASURAMENTS;
         }
