@@ -28,10 +28,16 @@
 #define BMP280_I2C_ADDR_ALT 0x77 // SDO-high variant
 
 // longest transaction 24 bytes
-// 9 * (1 adress-write byte + 1 register byte + 1 address-read byte + 24 data bytes) + 3 = 246 bits
+
+// 9 * (1 address-write byte + 1 register byte + 1 address-read byte + 24 data bytes)
+//+ 3 (START, repeated START, STOP) = 246 bits
+
 // 1 / 100 000 = 10 microseconds per bit
 // 246 bits * 10 microseconds = 2460 microseconds = 2.46 ms
-#define BMP280_I2C_TXN_TIMEOUT_TICKS 5U // at least 4 ms, margin 1.5 ms = 55%
+
+// >= N SysTick ticks guarantees only N - 1 ms, so 5 ticks ->
+// at least 4 ms, margin 1.5 ms
+#define BMP280_I2C_TXN_TIMEOUT_MS 5U
 
 typedef enum
 {

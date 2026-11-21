@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include "bmp280.h"
-#include "systick/systick.h"
+#include "osal/osal_time.h"
 
 BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
 {
     // the transaction is not done
-    if (SysTick_GetTick() - hbmp->missed_stop_start_tick >= BMP280_I2C_TXN_TIMEOUT_TICKS)
+    if (osal_get_ms() - hbmp->missed_stop_start_tick >= BMP280_I2C_TXN_TIMEOUT_MS)
     {
         hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
         I2C_Cleanup();
@@ -51,7 +51,7 @@ BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
-    hbmp->missed_stop_start_tick = SysTick_GetTick();
+    hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
 }
@@ -119,7 +119,7 @@ BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
-    hbmp->missed_stop_start_tick = SysTick_GetTick();
+    hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
 }
@@ -137,7 +137,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
     // capture the start timestamp
     if (hbmp->measure_start_tick_status == BMP280_START_TICK_NEVER_CAPTURED)
     {
-        hbmp->measure_start_tick = SysTick_GetTick();
+        hbmp->measure_start_tick = osal_get_ms();
         hbmp->measure_start_tick_status = BMP280_START_TICK_ALREADY_CAPTURED;
     }
 
@@ -155,7 +155,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
             else
             {
                 // the current transaction is done, but the measurement is still ongoing, so check for timeout
-                if (SysTick_GetTick() - hbmp->measure_start_tick >= 15U)
+                if (osal_get_ms() - hbmp->measure_start_tick >= 15U)
                 {
                     // reset the measurement start tick status since for this measurement it is over
                     hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
@@ -184,7 +184,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
-    hbmp->missed_stop_start_tick = SysTick_GetTick();
+    hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
 }
@@ -201,7 +201,7 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
     {
         if (hbmp->hi2c->state == I2C_STATE_DONE)
         {
-            hbmp->measure_tick = SysTick_GetTick();
+            hbmp->measure_tick = osal_get_ms();
             hbmp->request_status = BMP280_REQUEST_NONE;
             hbmp->state = BMP280_STATE_RECONSTRUCT_MEASURAMENTS;
         }
@@ -226,7 +226,7 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
-    hbmp->missed_stop_start_tick = SysTick_GetTick();
+    hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
 }
@@ -348,7 +348,7 @@ BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
     }
 
     hbmp->request_status = BMP280_REQUEST_FIRED;
-    hbmp->missed_stop_start_tick = SysTick_GetTick();
+    hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
 }
