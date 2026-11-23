@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include "bmp280.h"
 #include "osal/osal_time.h"
+#include <string.h>
 
-BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
+static BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
 {
     // the transaction is not done
     if (osal_get_ms() - hbmp->missed_stop_start_tick >= BMP280_I2C_TXN_TIMEOUT_MS)
@@ -16,7 +17,7 @@ BMP280_Status_t BMP280_InflightTransactionTimeout(BMP280_HandleTypeDef *hbmp)
     return BMP280_OK;
 }
 
-BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
+static BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
 {
     // early rejection of a transaction with invalid parameters
     if (hbmp == NULL || hbmp->hi2c == NULL)
@@ -56,7 +57,7 @@ BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp)
     return BMP280_OK;
 }
 
-void BMP280_ReconstructCalibration(BMP280_HandleTypeDef *hbmp)
+static void BMP280_ReconstructCalibration(BMP280_HandleTypeDef *hbmp)
 {
     // if the function succedded, we have 24 bytes of calibration data
     // now we need to reconstruct 12 compensation (calibration) parameters
@@ -78,11 +79,11 @@ void BMP280_ReconstructCalibration(BMP280_HandleTypeDef *hbmp)
     // the BMP280 is fully initialized
     hbmp->isInitialized = 1;
 
-    hbmp->state = BMP280_STATE_CTRL_MEAS;
+    hbmp->state = BMP280_STATE_IDLE;
     return;
 }
 
-BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
+static BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
 {
     if (hbmp == NULL || hbmp->hi2c == NULL)
     {
@@ -124,7 +125,7 @@ BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp)
     return BMP280_OK;
 }
 
-BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
+static BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
 {
     // early rejection of a transaction with invalid parameters
     if (hbmp == NULL || hbmp->hi2c == NULL)
@@ -155,7 +156,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
             else
             {
                 // the current transaction is done, but the measurement is still ongoing, so check for timeout
-                if (osal_get_ms() - hbmp->measure_start_tick >= 15U)
+                if (osal_get_ms() - hbmp->measure_start_tick >= BMP280_MEASUREMENT_TIMEOUT_MS)
                 {
                     // reset the measurement start tick status since for this measurement it is over
                     hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
@@ -189,7 +190,7 @@ BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp)
     return BMP280_OK;
 }
 
-BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
+static BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
 {
     // early rejection of a transaction with invalid parameters
     if (hbmp == NULL || hbmp->hi2c == NULL)
@@ -231,7 +232,7 @@ BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp)
     return BMP280_OK;
 }
 
-void BMP280_ReconstructMeasurements(BMP280_HandleTypeDef *hbmp)
+static void BMP280_ReconstructMeasurements(BMP280_HandleTypeDef *hbmp)
 {
     // after the transmission we have 6 bytes:
     // raw_adc[0] - 0xF7 - MSB of pressure
@@ -252,7 +253,7 @@ void BMP280_ReconstructMeasurements(BMP280_HandleTypeDef *hbmp)
 }
 
 // returns temperature in DegC, resolution is 0.01 DegC (5123 equals 51.23 Degrees)
-int32_t BMP280_Temp_Compensate(BMP280_HandleTypeDef *hbmp, int32_t temp_adc, int32_t *t_fine)
+static int32_t BMP280_Temp_Compensate(BMP280_HandleTypeDef *hbmp, int32_t temp_adc, int32_t *t_fine)
 {
     int32_t var1, var2, T;
     var1 = (((temp_adc >> 3) - ((int32_t)hbmp->calib.dig_T1 << 1)) * ((int32_t)hbmp->calib.dig_T2)) >> 11;
@@ -266,7 +267,7 @@ int32_t BMP280_Temp_Compensate(BMP280_HandleTypeDef *hbmp, int32_t temp_adc, int
 
 // returns pressure in Pa as unsigned 32 bit integer in Q24.8 format (24 integer bits and 8 fractional bits).
 // 24674867 = 24674867/256 = 96386.2 Pa = 963.862 hPa
-uint32_t BMP280_Pressure_Compensate(BMP280_HandleTypeDef *hbmp, int32_t press_adc, int32_t t_fine)
+static uint32_t BMP280_Pressure_Compensate(BMP280_HandleTypeDef *hbmp, int32_t press_adc, int32_t t_fine)
 {
     int64_t var1, var2, p;
     var1 = ((int64_t)t_fine) - 128000;
@@ -291,7 +292,7 @@ uint32_t BMP280_Pressure_Compensate(BMP280_HandleTypeDef *hbmp, int32_t press_ad
 }
 
 // high-lever function that manages compensation calculations
-void BMP280_CalculateData(BMP280_HandleTypeDef *hbmp)
+static void BMP280_CalculateData(BMP280_HandleTypeDef *hbmp)
 {
     int32_t t_fine = 0;
 
@@ -304,7 +305,7 @@ void BMP280_CalculateData(BMP280_HandleTypeDef *hbmp)
     return;
 }
 
-BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
+static BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp)
 {
     if (hbmp == NULL || hbmp->hi2c == NULL)
     {
@@ -322,9 +323,6 @@ BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
             {
                 return BMP280_ERR_CHIP_ID;
             }
-
-            // if the received_id corresponds with our anticipated result, populate ctrl_meas inside the handle
-            hbmp->ctrl_meas = meas;
 
             hbmp->state = BMP280_STATE_READ_CALIBRATION;
         }
@@ -351,4 +349,180 @@ BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas)
     hbmp->missed_stop_start_tick = osal_get_ms();
 
     return BMP280_OK;
+}
+
+static void enter_error(BMP280_HandleTypeDef *hbmp, BMP280_State_t state, BMP280_State_t current_state, BMP280_Status_t status_code)
+{
+    if ((state != BMP280_STATE_ERROR) && (state != BMP280_STATE_FAULT))
+        return;
+
+    hbmp->cumulative_error_counter++;
+    hbmp->error_counters[current_state]++;
+    hbmp->last_error_code = status_code;
+    hbmp->state = state;
+}
+
+BMP280_Status_t BMP280_Configure(BMP280_HandleTypeDef *hbmp, I2C_HandleTypeDef *hi2c, uint8_t slave_addr, BMP280_Ctrl_Meas_t meas)
+{
+    if (hbmp == NULL || hi2c == NULL)
+    {
+        return BMP280_ERROR;
+    }
+
+    memset(hbmp, 0, sizeof(*hbmp));
+    hbmp->hi2c = hi2c;
+    hbmp->slave_addr = slave_addr;
+    hbmp->ctrl_meas = meas;
+    hbmp->state = BMP280_STATE_INIT;
+    hbmp->request_status = BMP280_REQUEST_NONE;
+    hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
+    return BMP280_OK;
+}
+
+BMP280_Status_t BMP280_StartMeasurement(BMP280_HandleTypeDef *hbmp)
+{
+    if (hbmp == NULL || hbmp->hi2c == NULL)
+    {
+        return BMP280_ERROR;
+    }
+
+    if ((hbmp->state != BMP280_STATE_READY) && (hbmp->state != BMP280_STATE_IDLE))
+    {
+        return BMP280_ERROR;
+    }
+
+    // reset fields
+    hbmp->request_status = BMP280_REQUEST_NONE;
+    hbmp->retries = 0;
+    hbmp->measure_start_tick = 0;
+    hbmp->measure_start_tick_status = BMP280_START_TICK_NEVER_CAPTURED;
+
+    // BMP start measurements
+    hbmp->state = BMP280_STATE_CTRL_MEAS;
+
+    return BMP280_OK;
+}
+
+BMP280_ProcessState_t BMP280_Process(BMP280_HandleTypeDef *hbmp)
+{
+    if (hbmp == NULL || hbmp->hi2c == NULL)
+    {
+        return BMP280_PROCESS_FAILED;
+    }
+
+    BMP280_Status_t status_res;
+    switch (hbmp->state)
+    {
+    case BMP280_STATE_IDLE:
+        break;
+    case BMP280_STATE_INIT:
+        status_res = BMP280_Init(hbmp);
+
+        if (status_res == BMP280_ERR_CHIP_ID)
+        {
+            // wrong id = wrong device
+            enter_error(hbmp, BMP280_STATE_FAULT, hbmp->state, status_res);
+        }
+        else if (status_res != BMP280_OK)
+        {
+            enter_error(hbmp, BMP280_STATE_ERROR, hbmp->state, status_res);
+        }
+        break;
+    case BMP280_STATE_READ_CALIBRATION:
+        status_res = BMP280_ReadCalibration(hbmp);
+        if (status_res != BMP280_OK)
+        {
+            enter_error(hbmp, BMP280_STATE_ERROR, hbmp->state, status_res);
+        }
+        break;
+    case BMP280_STATE_RECONSTRUCT_CALIBRATION:
+        BMP280_ReconstructCalibration(hbmp);
+        break;
+    case BMP280_STATE_CTRL_MEAS:
+        status_res = BMP280_WriteCtrlMeas(hbmp);
+        if (status_res != BMP280_OK)
+        {
+            enter_error(hbmp, BMP280_STATE_ERROR, hbmp->state, status_res);
+        }
+        break;
+    case BMP280_STATE_MEASURING:
+        status_res = BMP280_Measuring(hbmp);
+        if (status_res != BMP280_OK)
+        {
+            enter_error(hbmp, BMP280_STATE_ERROR, hbmp->state, status_res);
+        }
+        break;
+    case BMP280_STATE_READ_MEASURAMENTS:
+        status_res = BMP280_ReadMeasurements(hbmp);
+        if (status_res != BMP280_OK)
+        {
+            enter_error(hbmp, BMP280_STATE_ERROR, hbmp->state, status_res);
+        }
+        break;
+    case BMP280_STATE_RECONSTRUCT_MEASURAMENTS:
+        BMP280_ReconstructMeasurements(hbmp);
+        break;
+    case BMP280_STATE_COMPENSATE:
+        BMP280_CalculateData(hbmp);
+        break;
+    case BMP280_STATE_READY:
+
+        break;
+    case BMP280_STATE_ERROR:
+        if (hbmp->retries >= 3)
+        {
+            // the counter is exhausted
+            hbmp->state = BMP280_STATE_FAULT;
+            break;
+        }
+
+        if (hbmp->hi2c->state == I2C_STATE_IDLE)
+        {
+            hbmp->retries++;
+
+            if (hbmp->isInitialized == 0)
+            {
+                hbmp->state = BMP280_STATE_INIT;
+            }
+            else
+            {
+                // begin a transaction from the beginning (Calibration is read once at the very beginning, so omit the state)
+                hbmp->state = BMP280_STATE_CTRL_MEAS;
+            }
+        }
+
+        break;
+    case BMP280_STATE_FAULT:
+        hbmp->state = BMP280_STATE_DEAD;
+        break;
+
+    case BMP280_STATE_DEAD:
+        break;
+    }
+
+    switch (hbmp->state)
+    {
+    case BMP280_STATE_IDLE:
+        return BMP280_PROCESS_IDLE;
+
+    case BMP280_STATE_INIT:
+    case BMP280_STATE_READ_CALIBRATION:
+    case BMP280_STATE_RECONSTRUCT_CALIBRATION:
+    case BMP280_STATE_CTRL_MEAS:
+    case BMP280_STATE_MEASURING:
+    case BMP280_STATE_READ_MEASURAMENTS:
+    case BMP280_STATE_RECONSTRUCT_MEASURAMENTS:
+    case BMP280_STATE_COMPENSATE:
+    case BMP280_STATE_ERROR:
+        return BMP280_PROCESS_BUSY;
+
+    case BMP280_STATE_READY:
+        return BMP280_PROCESS_READY;
+
+    case BMP280_STATE_FAULT:
+    case BMP280_STATE_DEAD:
+        return BMP280_PROCESS_FAILED;
+    }
+
+    return BMP280_PROCESS_FAILED;
 }

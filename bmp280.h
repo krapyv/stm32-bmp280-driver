@@ -39,6 +39,8 @@
 // at least 4 ms, margin 1.5 ms
 #define BMP280_I2C_TXN_TIMEOUT_MS 5U
 
+#define BMP280_MEASUREMENT_TIMEOUT_MS 15U
+
 typedef enum
 {
     BMP280_OK = 0,
@@ -104,6 +106,14 @@ typedef enum
     BMP280_STATE_DEAD
 } BMP280_State_t;
 
+typedef enum
+{
+    BMP280_PROCESS_IDLE = 0,
+    BMP280_PROCESS_BUSY,
+    BMP280_PROCESS_READY,
+    BMP280_PROCESS_FAILED,
+} BMP280_ProcessState_t;
+
 typedef struct
 {
     uint16_t dig_T1; // 0x88/0x89
@@ -135,7 +145,7 @@ typedef struct
     uint8_t slave_addr;
     BMP280_State_t state;
     BMP280_Request_Status_t request_status;
-    uint8_t retries;             // reset only on full-cycle success
+    uint8_t retries;             // reset at the start of each measurement
     uint32_t measure_start_tick; // for measure status polling
     uint32_t missed_stop_start_tick;
     BMP280_Start_Tick_Status_t measure_start_tick_status;
@@ -155,18 +165,16 @@ typedef struct
     uint32_t measure_tick;
 
     uint8_t isInitialized;
+
+    // error counters
+    uint32_t cumulative_error_counter;
+    uint32_t error_counters[13]; // must match the number of states in BMP280_State_t
+    BMP280_Status_t last_error_code;
 } BMP280_HandleTypeDef;
 
 // function headers
-BMP280_Status_t BMP280_ReadCalibration(BMP280_HandleTypeDef *hbmp);
-void BMP280_ReconstructCalibration(BMP280_HandleTypeDef *hbmp);
-BMP280_Status_t BMP280_WriteCtrlMeas(BMP280_HandleTypeDef *hbmp);
-BMP280_Status_t BMP280_Measuring(BMP280_HandleTypeDef *hbmp);
-BMP280_Status_t BMP280_ReadMeasurements(BMP280_HandleTypeDef *hbmp);
-void BMP280_ReconstructMeasurements(BMP280_HandleTypeDef *hbmp);
-int32_t BMP280_Temp_Compensate(BMP280_HandleTypeDef *hbmp, int32_t temp_adc, int32_t *t_fine);
-uint32_t BMP280_Pressure_Compensate(BMP280_HandleTypeDef *hbmp, int32_t press_adc, int32_t t_fine);
-void BMP280_CalculateData(BMP280_HandleTypeDef *hbmp);
-BMP280_Status_t BMP280_Init(BMP280_HandleTypeDef *hbmp, BMP280_Ctrl_Meas_t meas);
+BMP280_Status_t BMP280_Configure(BMP280_HandleTypeDef *hbmp, I2C_HandleTypeDef *hi2c, uint8_t slave_addr, BMP280_Ctrl_Meas_t meas);
+BMP280_Status_t BMP280_StartMeasurement(BMP280_HandleTypeDef *hbmp);
+BMP280_ProcessState_t BMP280_Process(BMP280_HandleTypeDef *hbmp);
 
-#endif
+#endif // BMP280_H
